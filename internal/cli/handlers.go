@@ -4,8 +4,10 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"os"
 	"time"
 
+	"github.com/mdp/qrterminal/v3"
 	"github.com/pquerna/otp/totp"
 	_ "modernc.org/sqlite"
 )
@@ -19,7 +21,7 @@ func (a *App) handleLogin() {
 		fmt.Println("Auth Failure!!")
 		return
 	}
-	passwordBytes, err := a.rl.ReadPassword("Password")
+	passwordBytes, err := a.rl.ReadPassword("Password: ")
 	if err != nil {
 		fmt.Println("Auth Failure!!")
 	}
@@ -40,7 +42,7 @@ func (a *App) handleLogin() {
 	}
 
 	// Check for the blocked time passing
-	if time.Now().Before(singleUser.BlockedTime) {
+	if singleUser.BlockedTime != nil && time.Now().Before(*singleUser.BlockedTime) {
 		slog.Info("User", singleUser.Username, "Still blocked!!")
 		fmt.Println("Lockout for Many Incorrect Login Attempts!!")
 		return
@@ -49,11 +51,13 @@ func (a *App) handleLogin() {
 	attempts := singleUser.Attempts
 	// password comparison
 	if !checkPasswordHash(password, singleUser.StoredPassword) {
+		fmt.Printf("Hash from DB: %q\n", singleUser.StoredPassword)
 		slog.Error("[Login-Handler]: Incorrect Password")
 		fmt.Println("Incorrect Password!!")
 
 		// check for the attempt limit
 		if attempts+1 >= globalTryLimit {
+			slog.Info("[Login-Handler]: Login Attempt exceeded!! Locking out!!")
 			// block: reset attempts to 0 once blocked, set the lockout window
 			attempts = 0
 			blockedUntil := time.Now().Add(15 * time.Minute)
@@ -129,14 +133,19 @@ func (a *App) handleRegister() {
 			return
 		}
 		password := string(passwordBytes)
-		confirmPasswordBytes, _ := a.rl.ReadPassword("Confirm Password: ")
-		confirmPassword := string(confirmPasswordBytes)
+		confirmPasswordBytes, err := a.rl.ReadPassword("Confirm Password: ")
+		if err != nil {
+			fmt.Println("[Register-Handler]: Registration Failed !!")
+			return
+		}
+
+		confirmPassword = string(confirmPasswordBytes)
 
 		if password != confirmPassword {
 			fmt.Println("Password Doesnt Matched")
 			continue
-
 		} else {
+
 			break
 		}
 	}
@@ -202,6 +211,15 @@ func (a *App) handleEnable2Fa() {
 	}
 
 	fmt.Println("Secret (add this to your authenticator app):", key.Secret())
+
+	//  Qr code configuration , halfBlocks reduce height and QuietZone use to trim borders, level is the redundancy level of the block
+	config := qrterminal.Config{
+		Level:      qrterminal.L,
+		Writer:     os.Stdout,
+		HalfBlocks: true,
+		QuietZone:  1, // default is larger
+	}
+	qrterminal.GenerateWithConfig(key.URL(), config)
 
 	a.rl.SetPrompt("Current 2FA code: ")
 	code, err := a.rl.Readline()

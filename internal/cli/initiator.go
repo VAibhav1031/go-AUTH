@@ -61,9 +61,9 @@ func Initiate() {
 		password TEXT  NOT NULL,
 		created_at DATETIME,
 		mfa_enabled NOT NULL DEFAULT 0,
-		mfa_secret TEXT,
+		mfa_secret TEXT NOT NULL DEFAULT '' ,
 		last_login DATETIME,
-		attempts INTEGER,
+		attempts INTEGER DEFAULT 0,
 		blocked_time DATETIME
 	);`
 	if _, err := db.Exec(createTableSQL); err != nil {
@@ -149,13 +149,14 @@ func Initiate() {
 		}
 
 		if handlers == nil {
-			fmt.Printf("Unknown command!! '%v'", cmd[0])
+			fmt.Printf("Unknown command!! '%v'\n", cmd[0])
 			continue
 		}
 
 		handlers()
 
 		rl.SetPrompt(">> ") // Precautionary doing so , for any handler that made changes
+		fmt.Println()
 	}
 
 }

@@ -36,7 +36,7 @@ type User struct {
 	MFASecret      string     `db:"mfa_secret"`
 	LastLogin      *time.Time `db:"last_login"`
 	Attempts       int        `db:"attempts"`
-	BlockedTime    time.Time  `db:"blocked_time"` // Safe handling for NULL times
+	BlockedTime    *time.Time `db:"blocked_time"` // Safe handling for NULL times
 
 }
 
@@ -68,25 +68,31 @@ func handleHelp() {
 func printUserDetails(u *User, s *Session) {
 
 	fmt.Println("── Logged in ──")
-	fmt.Printf("Username:      %s\n", u.Username)
-	fmt.Printf("Registered on: %s\n", u.CreatedAt.Format("2006-01-02 15:04:05"))
+	fmt.Printf("Username:        	%s\n", u.Username)
 
 	mfaStatus := "disabled"
 	if u.MFAEnabled {
 		mfaStatus = "enabled"
 	}
-	fmt.Printf("MFA status:    %s\n", mfaStatus)
+	fmt.Printf("MFA status:    		%s\n", mfaStatus)
+
+	fmt.Printf("Registered on:   	%s\n", u.CreatedAt.Format("2006-01-02 15:04:05"))
 
 	fmt.Printf("Session expires at: %s\n", s.ExpiresAt.Format("2006-01-02 15:04:05"))
 
 	if u.LastLogin != nil {
-		fmt.Printf("Last login:    %s\n", u.LastLogin.Format("2006-01-02 15:04:05"))
+		fmt.Printf("Last login:     %s\n", u.LastLogin.Format("2006-01-02 15:04:05"))
 	} else {
 		fmt.Println("Last login:    (first login)")
 	}
 }
 func banner() {
-	fmt.Println(`
+	// \033[31m sets the color to Red
+	// \033[0m resets the color back to normal
+	const red = "\033[31m"
+	const reset = "\033[0m"
+
+	fmt.Println(red + `
  _______  _______         _______          _________                 _______  _       _________
 (  ____ \(  ___  )       (  ___  )|\     /|\__   __/|\     /|       (  ____ \( \      \__   __/
 | (    \/| (   ) |       | (   ) || )   ( |   ) (   | )   ( |       | (    \/| (         ) (   
@@ -94,5 +100,5 @@ func banner() {
 | | ____ | |   | |(_____)|  ___  || |   | |   | |   |  ___  |(_____)| |      | |         | |   
 | | \_  )| |   | |       | (   ) || |   | |   | |   | (   ) |       | |      | |         | |   
 | (___) || (___) |       | )   ( || (___) |   | |   | )   ( |       | (____/\| (____/\___) (___
-(_______)(_______)       |/     \|(_______)   )_(   |/     \|       (_______/(_______/\_______/`)
+(_______)(_______)       |/     \|(_______)   )_(   |/     \|       (_______/(_______/\_______/` + reset)
 }

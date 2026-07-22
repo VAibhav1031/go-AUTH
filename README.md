@@ -1,10 +1,10 @@
 # go-AUTH — Containerized CLI Login System with Optional 2FA
 
-A command-line authentication system built in Go, supporting user registration, login, account lockout, session expiry, and optional TOTP-based two-factor authentication (Google Authenticator compatible). Runs fully containerized with persistent SQLite storage.
+A command-line authentication system built in Go, supporting user registration, login, account lockout, session expiry, and optional TOTP-based two-factor authentication (Google Authenticator compatible) ,QR code Generated for ease. Runs fully containerized with persistent SQLite storage.
 
 ## Features
 
-- User registration with bcrypt password hashing (salted, adaptive cost)
+- User registration with bcrypt password hashing (salted)
 - Login with account lockout after repeated failed attempts
 - Optional TOTP-based 2FA — enable/disable per account, compatible with Google Authenticator or any standard authenticator app
 - Session management with configurable expiry
@@ -25,10 +25,12 @@ Clone the repo and build/run with Docker Compose:
 git clone https://github.com/VAibhav1031/go-AUTH.git
 cd go-AUTH
 docker compose build
-docker compose run --rm app_cli
+docker compose run --rm -it app_cli
 ```
 
-> **Note:** Use `docker compose run --rm app_cli`, not `docker compose up`. This is an interactive CLI, and `up` doesn't attach your terminal's stdin the way an interactive session needs. `run` gives you a proper attached terminal, and `--rm` cleans up the container when you exit. Your data isn't affected either way — it's persisted separately in the `auth_db` volume.
+> **Note:** Use `docker compose run --rm -it app_cli`, not `docker compose up`. This is an interactive CLI, and `up` doesn't attach your terminal's stdin the way an interactive session needs. `run` gives you a proper attached terminal, and `--rm` cleans up the container when you exit. Your data isn't affected either way — it's persisted separately in the `auth_db` volume.
+
+> `docker compose up` only provide stderr/stdout  no stdin , tty which is needed for the interactive cli usage
 
 Your database lives in a named Docker volume (`auth_db`, mounted at `/app/data` inside the container), so registered users and session state survive restarts and rebuilds. To wipe all data and start fresh:
 
@@ -154,6 +156,7 @@ Created automatically on first run if it doesn't already exist.
 - Login credentials and 2FA codes are entered via interactive follow-up prompts rather than command-line arguments, so they never end up in shell history.
 - Password input is masked (no echo) at the terminal.
 - TOTP is implemented using [`pquerna/otp`](https://github.com/pquerna/otp), a well-tested RFC 6238 implementation, rather than a hand-rolled version.
+- You can easily Scan the secret key with google-Authenticator APP for ease and use the 2FA code to verify
 
 ## Tech Stack
 
@@ -163,3 +166,4 @@ Created automatically on first run if it doesn't already exist.
 - **chzyer/readline** — interactive prompt, history, and Tab-completion
 - **golang.org/x/crypto/bcrypt** — password hashing
 - **pquerna/otp** — TOTP generation/validation
+- **mdp/qrterminal/v3** - QR Code Generator using the TOTP-secret URL
