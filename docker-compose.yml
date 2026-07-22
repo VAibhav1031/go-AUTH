@@ -1,0 +1,14 @@
+services:
+  app_cli:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - cli_auth:/
+
+
+
+volumes:
+  cli_auth:
+    name: cli_auth
+
