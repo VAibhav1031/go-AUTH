@@ -1,14 +1,11 @@
 services:
   app_cli:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
     volumes:
-      - cli_auth:/
+      - auth_db:/app/data
 
 
 
 volumes:
-  cli_auth:
-    name: cli_auth
+  auth_db:
 

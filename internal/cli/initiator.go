@@ -15,11 +15,11 @@ import (
 )
 
 type Session struct {
-	UserID     int64
-	Username   string
-	ExpiresAt  time.Time
-	MFAenabled bool
-	LastLogin  *time.Time
+	UserID    int64
+	Username  string
+	ExpiresAt time.Time
+	// MFAenabled bool
+	// LastLogin  *time.Time
 }
 
 var preLoginCompleter = readline.NewPrefixCompleter(
@@ -36,7 +36,7 @@ var postLoginCompleter = readline.NewPrefixCompleter(
 	readline.PcItem("logout"),
 	readline.PcItem("help"),
 )
-var TIMEOUT = 5 * time.Minute
+var SessionTimeout = 5 * time.Minute
 
 func Initiate() {
 	var db *sqlx.DB
@@ -47,9 +47,9 @@ func Initiate() {
 	to retrieve element over the struct in the variable and easy to use and manage
 	*/
 
-	db, err := sqlx.Connect("sqlite", "app.db")
+	db, err := sqlx.Connect("sqlite", "/app/data/app.db")
 	if err != nil {
-		slog.Error("Failed to open database: ", err)
+		slog.Error("Failed to open database ", "error: ", err)
 		// some error print and exit
 	}
 	defer db.Close()
@@ -59,14 +59,14 @@ func Initiate() {
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		username TEXT UNIQUE NOT NULL,
 		password TEXT  NOT NULL,
-		create_at DATETIME,
+		created_at DATETIME,
 		mfa_enabled BOOL,
 		last_login DATETIME,
 		attempts INTEGER,
 		blocked_time DATETIME
 	);`
 	if _, err := db.Exec(createTableSQL); err != nil {
-		slog.Error("Failed to create table: %v", err)
+		slog.Error("Failed to create table ", "error :", err)
 		//  Some error and exit
 	}
 	/*------------------------------------ */
@@ -82,7 +82,7 @@ func Initiate() {
 		AutoComplete: preLoginCompleter,
 	})
 	if err != nil {
-		slog.Error("Readline Error", err)
+		slog.Error("Readline Error", "error: ", err)
 		fmt.Println("Fail To setup the CLI!!")
 		return
 	}
@@ -100,45 +100,46 @@ func Initiate() {
 
 	postLoginCmds := map[string]func(){
 		"whoami":      app.handleWhoami,
-		"enable-2fa":  app.handleEnable2Fa,
-		"disable-2fa": app.handleDisable2Fa,
+		"enable-2fa":  nil,
+		"disable-2fa": nil,
 		"logout":      app.handleLogout,
 		"help":        handlePostHelp}
 
 	/*-------------MAIN-LOOP-----------*/
 
 	for {
+
+		// session Expiry  Check
+		if app.session != nil &&
+			time.Now().After(app.session.ExpiresAt) {
+
+			fmt.Println("Session expired.")
+			app.session = nil
+		}
+
 		line, err := rl.Readline()
 		if err != nil {
 			slog.Error("Readline Error")
 			fmt.Println("")
 			return
-		} // log
+		}
 		cmd := strings.Fields(strings.TrimSpace(line))
 
 		if len(cmd) == 0 {
 			continue // user just hit Enter on an empty line — nothing to do, loop again
 		}
+
 		if len(cmd) > 1 {
 			slog.Error("More Than one command")
 			fmt.Println("Please Enter only Allowed commands!! use 'help'..")
 			continue
-			//log
 		}
 
 		/*  Session Management */
-		if currentSession == nil {
-			//  do we have to say something or we have to show the comamnds or what
-			// or lastLogin thing
+		if app.session == nil {
 			handlers, ok = preLoginCmds[cmd[0]]
+			app.rl.Config.AutoComplete = preLoginCompleter
 		} else {
-			// currentSession.ExpiresAt = timeout.Add(currentSession.LoggedInAt.Sub(time.Time{}))
-
-			if time.Now().After(currentSession.ExpiresAt) {
-				currentSession = nil
-				continue
-			}
-
 			app.rl.Config.AutoComplete = postLoginCompleter
 			handlers, ok = postLoginCmds[cmd[0]]
 

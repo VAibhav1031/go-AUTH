@@ -1,4 +1,4 @@
-FROM  golang:1.26-apline as builder
+FROM  golang:1.26-alpine as builder
 
 WORKDIR /app 
 
@@ -8,12 +8,11 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o go_auth./cmd/go_auth_cli/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o go_auth ./cmd/go_auth_cli/
 
 
-
-FROM apline:latest 
-WORKDIR /root/
+FROM alpine:latest 
+WORKDIR /app
 
 COPY --from=builder /app/go_auth . 
 CMD ["./go_auth"]

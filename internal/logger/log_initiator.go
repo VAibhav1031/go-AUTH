@@ -3,33 +3,33 @@ package logger
 import (
 	"log/slog"
 	"os"
+	"path/filepath"
 )
 
 func LoggerInitiator() {
 
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-
-		slog.Error("Failed to open the log file", "error", err)
-		os.Exit(1)
-
-	}
-
-	// Create the directory if not exist
-	logFolderPath := homeDir + "/.local/go-Auth"
-	// i want to make sure that this should have the mkdir -p kind of the behaviour thing
-	err = os.MkdirAll(logFolderPath, 0755)
-	if err != os.ErrExist || err != nil {
-		slog.Error("Failed in the creation of the folder")
+		slog.Error("failed to get home directory", "error", err)
 		os.Exit(1)
 	}
 
-	logFilepath := homeDir + "/.local/go-Auth/logs/unilog.log"
-	file, err := os.OpenFile(logFilepath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	logDir := filepath.Join(homeDir, ".local", "go-Auth", "logs")
+
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		slog.Error("failed to create log directory", "error", err)
+		os.Exit(1)
+	}
+
+	logFile := filepath.Join(logDir, "unilog.log")
+
+	file, err := os.OpenFile(logFile,
+		os.O_CREATE|os.O_WRONLY|os.O_APPEND,
+		0644,
+	)
 	if err != nil {
-		slog.Error("Failed to open the log file", "error", err)
+		slog.Error("failed to open log file", "error", err)
 		os.Exit(1)
-
 	}
 
 	handler := slog.NewJSONHandler(file, &slog.HandlerOptions{

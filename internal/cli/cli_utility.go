@@ -51,22 +51,28 @@ type App struct {
 
 func (a *App) handleLogin() {
 	a.rl.SetPrompt("Username: ")
-	username, _ := a.rl.Readline()
-
-	passwordBytes, _ := a.rl.ReadPassword("Password")
+	username, err := a.rl.Readline()
+	if err != nil {
+		fmt.Println("Auth Failure!!")
+		return
+	}
+	passwordBytes, err := a.rl.ReadPassword("Password")
+	if err != nil {
+		fmt.Println("Auth Failure!!")
+	}
 	password := string(passwordBytes)
 
 	userDetailSQL := `SELECT  * FROM users where username = ?;`
 
 	var singleUser User
-	err := a.db.Get(&singleUser, userDetailSQL, username)
+	err = a.db.Get(&singleUser, userDetailSQL, username)
 	if err == sql.ErrNoRows {
 		slog.Error("User Not Found")
 		fmt.Println("User", username, "Not registered!!")
 		return // user doesnt exist so exit the handler
 	} else if err != nil {
-		slog.Error("Database error :%v", err)
-		fmt.Println("AUTH FAILURE")
+		slog.Error("Database error", "error", err)
+		fmt.Println("AUTH FAILURE !!")
 		return
 	}
 
@@ -86,9 +92,10 @@ func (a *App) handleLogin() {
 		// check for the attempt limit
 		if attempts+1 >= globaTryLimit {
 			// block: reset attempts to 0 once blocked, set the lockout window
+			attempts = 0
 			blockedUntil := time.Now().Add(15 * time.Minute)
 			blockSQL := `UPDATE users SET attempts = ?, blocked_time = ? WHERE username = ?;`
-			_, err := a.db.Exec(blockSQL, attempts+1, blockedUntil, username)
+			_, err := a.db.Exec(blockSQL, attempts, blockedUntil, username)
 			if err != nil {
 				slog.Error("Update failed", "error", err)
 				fmt.Println("AUTH FAILURE")
@@ -119,14 +126,13 @@ func (a *App) handleLogin() {
 
 	// we have to populate the session here
 	loggedInAt := time.Now()
-	expiresAt := loggedInAt.Add(TIMEOUT)
+	expiresAt := loggedInAt.Add(SessionTimeout)
 
-	func() {
-		a.session.UserID = int64(singleUser.ID)
-		a.session.Username = username
-		a.session.ExpiresAt = expiresAt
-		a.session.LastLogin = singleUser.LastLogin
-	}()
+	a.session = &Session{
+		UserID:    int64(singleUser.ID),
+		Username:  singleUser.Username,
+		ExpiresAt: expiresAt,
+	}
 
 	// Display the Post login Message ..
 
@@ -137,7 +143,11 @@ func (a *App) handleLogin() {
 func (a *App) handleRegister() {
 
 	a.rl.SetPrompt("Username: ")
-	username, _ := a.rl.Readline()
+	username, err := a.rl.Readline()
+	if err != nil {
+		fmt.Println("Registration Failed !!")
+		return
+	}
 
 	var lastID int64
 	var confirmPassword string
@@ -148,14 +158,16 @@ func (a *App) handleRegister() {
 		confirmPassword := string(confirmPasswordBytes)
 
 		if password != confirmPassword {
+			fmt.Println("Password Doesnt Matched")
 			continue
+
 		} else {
 			break
 		}
 	}
 	hashedPassword, err := hashPassword(confirmPassword)
 	if err != nil {
-		slog.Error("HashPassword Failure", err)
+		slog.Error("HashPassword Failure", "error", err)
 		fmt.Println("Registration Failed !!")
 	}
 
@@ -165,7 +177,7 @@ func (a *App) handleRegister() {
 
 	result, err := a.db.Exec(insertSQL, username, hashedPassword, time.Now())
 	if err != nil {
-		slog.Error("Insert Failed for the Register Handle (likely duplicate Password or Username): ", err)
+		slog.Error("Insert Failed for the Register Handle (likely duplicate Password or Username): ", "error", err)
 		fmt.Println("Registration Failed !!")
 		return
 	} else {
@@ -173,14 +185,8 @@ func (a *App) handleRegister() {
 		fmt.Printf("Registered user with Id %d\n", lastID)
 
 	}
-	// populate the session here i would say soo that would be the helpful thing
 
-	a.session = &Session{UserID: lastID, Username: username, LastLogin: nil}
-	func() {
-		a.session.UserID = lastID
-		a.session.Username = username
-		a.session.LastLogin = nil
-	}()
+	// change the completer to the Post Login based
 	a.rl.Config.AutoComplete = postLoginCompleter
 
 }
@@ -188,18 +194,30 @@ func (a *App) handleRegister() {
 /* Post Login Methods */
 
 func (a *App) handleWhoami() {
+	var user *User
 
-	fmt.Println(a.session.Username)
+	err := a.db.Get(
+		&user,
+		"SELECT * FROM users WHERE id = ?",
+		a.session.UserID,
+	)
+
+	if err != nil {
+		fmt.Println("Unable to fetch user.")
+		return
+	}
+	printUserDetails(user, a.session)
 }
 
 func (a *App) handleLogout() {
 	a.session = nil
 	a.rl.Config.AutoComplete = preLoginCompleter
+	fmt.Println("Logged out")
 }
 
-func (a *App) handleEnable2Fa()
-
-func (a *App) handleDisable2Fa()
+// func (a *App) handleEnable2Fa()
+//
+// func (a *App) handleDisable2Fa()
 
 // OTher Utility Functions
 func handlePostHelp() {
@@ -234,8 +252,8 @@ func printUserDetails(u *User, s *Session) {
 
 	fmt.Printf("Session expires at: %s\n", s.ExpiresAt.Format("2006-01-02 15:04:05"))
 
-	if s.LastLogin != nil {
-		fmt.Printf("Last login:    %s\n", s.LastLogin.Format("2006-01-02 15:04:05"))
+	if u.LastLogin != nil {
+		fmt.Printf("Last login:    %s\n", u.LastLogin.Format("2006-01-02 15:04:05"))
 	} else {
 		fmt.Println("Last login:    (first login)")
 	}
