@@ -34,7 +34,7 @@ func (a *App) handleLogin() {
 		fmt.Println("User", username, "Not registered!!")
 		return // user doesnt exist so exit the handler
 	} else if err != nil {
-		slog.Error("Database error", "error", err)
+		slog.Error("[Login-Handler]: Database error", "error", err)
 		fmt.Println("AUTH FAILURE !!")
 		return
 	}
@@ -49,7 +49,7 @@ func (a *App) handleLogin() {
 	attempts := singleUser.Attempts
 	// password comparison
 	if !checkPasswordHash(password, singleUser.StoredPassword) {
-		slog.Error("Incorrect Password")
+		slog.Error("[Login-Handler]: Incorrect Password")
 		fmt.Println("Incorrect Password!!")
 
 		// check for the attempt limit
@@ -60,14 +60,14 @@ func (a *App) handleLogin() {
 			blockSQL := `UPDATE users SET attempts = ?, blocked_time = ? WHERE username = ?;`
 			_, err := a.db.Exec(blockSQL, attempts, blockedUntil, username)
 			if err != nil {
-				slog.Error("Update failed", "error", err)
+				slog.Error("[Login-Handler]: Update failed", "error", err)
 				fmt.Println("AUTH FAILURE")
 			}
 		} else {
 			increaseSQL := `UPDATE users SET attempts = ? WHERE username = ?;`
 			_, err := a.db.Exec(increaseSQL, attempts+1, username)
 			if err != nil {
-				slog.Error("Update failed", "error", err)
+				slog.Error("[Login-Handler]: Update failed", "error", err)
 				fmt.Println("AUTH FAILURE")
 			}
 		}
@@ -78,7 +78,7 @@ func (a *App) handleLogin() {
 		zeroAttemptSQL := `UPDATE users SET attempts = 0, last_login = ? WHERE username = ?;`
 		_, err := a.db.Exec(zeroAttemptSQL, lastLogin, username)
 		if err != nil {
-			slog.Error("Update failed", "error", err)
+			slog.Error("[Login-Handler]: Update failed", "error ", err)
 			fmt.Println("AUTH FAILURE")
 			return
 		}
@@ -125,7 +125,7 @@ func (a *App) handleRegister() {
 	for {
 		passwordBytes, err := a.rl.ReadPassword("Password: ")
 		if err != nil {
-			fmt.Println("Registration Failed !!")
+			fmt.Println("[Register-Handler]: Registration Failed !!")
 			return
 		}
 		password := string(passwordBytes)
@@ -142,7 +142,7 @@ func (a *App) handleRegister() {
 	}
 	hashedPassword, err := hashPassword(confirmPassword)
 	if err != nil {
-		slog.Error("HashPassword Failure", "error", err)
+		slog.Error("[Register-Handler]: HashPassword Failure", "error", err)
 		fmt.Println("Registration Failed !!")
 	}
 
@@ -152,7 +152,7 @@ func (a *App) handleRegister() {
 
 	result, err := a.db.Exec(insertSQL, username, hashedPassword, time.Now())
 	if err != nil {
-		slog.Error("Insert Failed for the Register Handle (likely duplicate Password or Username): ", "error", err)
+		slog.Error("[Register-Handler]: Insert Failed for Register--Handler (likely duplicate Password or Username) ", "error: ", err)
 		fmt.Println("Registration Failed !!")
 		return
 	} else {
@@ -196,7 +196,7 @@ func (a *App) handleEnable2Fa() {
 		AccountName: a.session.Username,
 	})
 	if err != nil {
-		slog.Error("totp generate failed", "error", err)
+		slog.Error("[Enable2FA-Handler]: totp generate failed", "error", err)
 		fmt.Println("Could not enable 2FA")
 		return
 	}
@@ -216,7 +216,7 @@ func (a *App) handleEnable2Fa() {
 
 	updateSQL := `UPDATE users SET mfa_enabled = ?, mfa_secret = ? WHERE username = ?`
 	if _, err := a.db.Exec(updateSQL, true, key.Secret(), a.session.Username); err != nil {
-		slog.Error("failed to save mfa secret", "error", err)
+		slog.Error("[Enable2FA-Handler]: failed to save mfa secret", "error", err)
 		fmt.Println("Could not enable 2FA")
 		return
 	}
@@ -234,7 +234,7 @@ func (a *App) handleDisable2Fa() {
 
 	_, err := a.db.Exec(updateSQL, false, "", a.session.Username)
 	if err != nil {
-		slog.Error("failed to disable 2FA", "error", err)
+		slog.Error("[disable2FA-Handler]: failed to disable 2FA", "error", err)
 		fmt.Println("Could not disable 2FA")
 		return
 	}

@@ -60,7 +60,7 @@ func Initiate() {
 		username TEXT UNIQUE NOT NULL,
 		password TEXT  NOT NULL,
 		created_at DATETIME,
-		mfa_enabled BOOL,
+		mfa_enabled NOT NULL DEFAULT 0,
 		mfa_secret TEXT,
 		last_login DATETIME,
 		attempts INTEGER,
@@ -72,14 +72,13 @@ func Initiate() {
 		fmt.Println("CLI Init-Setup Failed")
 		os.Exit(1)
 	}
-	/*------------------------------------ */
 
 	// CLI Related variable initialization
 	var handlers func()
 
 	// Readline instance creation for the current tErminal
 	rl, err := readline.NewEx(&readline.Config{
-		Prompt:       "> ",
+		Prompt:       ">> ",
 		AutoComplete: preLoginCompleter,
 	})
 	if err != nil {
@@ -105,6 +104,9 @@ func Initiate() {
 		"disable-2fa": app.handleDisable2Fa,
 		"logout":      app.handleLogout,
 		"help":        handlePostHelp}
+
+	// call the banner
+	banner()
 
 	/*-------------MAIN-LOOP-----------*/
 
@@ -153,7 +155,7 @@ func Initiate() {
 
 		handlers()
 
-		rl.SetPrompt("> ") // Precautionary doing so , for any handler that made changes
+		rl.SetPrompt(">> ") // Precautionary doing so , for any handler that made changes
 	}
 
 }
