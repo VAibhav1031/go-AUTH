@@ -22,14 +22,24 @@ type Session struct {
 	LastLogin  *time.Time
 }
 
-var db *sqlx.DB
+var preLoginCompleter = readline.NewPrefixCompleter(
+	readline.PcItem("register"),
+	readline.PcItem("login"),
+	readline.PcItem("help"),
+	readline.PcItem("exit"),
+)
+
+var postLoginCompleter = readline.NewPrefixCompleter(
+	readline.PcItem("whoami"),
+	readline.PcItem("enable-2fa"),
+	readline.PcItem("disable-2fa"),
+	readline.PcItem("logout"),
+	readline.PcItem("help"),
+)
 var TIMEOUT = 5 * time.Minute
 
-func initDB() {
-
-}
-
 func Initiate() {
+	var db *sqlx.DB
 
 	/* DB INITIALIZATION
 	sqlx module used for the sql connection, because of its presistent connection check ,
@@ -48,9 +58,9 @@ func Initiate() {
 	createTableSQL := `CREATE TABLE IF NOT EXISTS users (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		username TEXT UNIQUE NOT NULL,
-		password TEXT UNIQUE NOT NULL,
-		create_at DATETIME
-		mfa_enabled BOOL
+		password TEXT  NOT NULL,
+		create_at DATETIME,
+		mfa_enabled BOOL,
 		last_login DATETIME,
 		attempts INTEGER,
 		blocked_time DATETIME
@@ -62,12 +72,15 @@ func Initiate() {
 	/*------------------------------------ */
 
 	// CLI Related variable initialization
-	var currentSession *Session = &Session{}
+	var currentSession *Session
 	var handlers func()
 	var ok bool
 
 	// Readline instance creation for the current tErminal
-	rl, err := readline.New("> ")
+	rl, err := readline.NewEx(&readline.Config{
+		Prompt:       "> ",
+		AutoComplete: preLoginCompleter,
+	})
 	if err != nil {
 		slog.Error("Readline Error", err)
 		fmt.Println("Fail To setup the CLI!!")
@@ -102,10 +115,14 @@ func Initiate() {
 			return
 		} // log
 		cmd := strings.Fields(strings.TrimSpace(line))
+
+		if len(cmd) == 0 {
+			continue // user just hit Enter on an empty line — nothing to do, loop again
+		}
 		if len(cmd) > 1 {
 			slog.Error("More Than one command")
 			fmt.Println("Please Enter only Allowed commands!! use 'help'..")
-			return
+			continue
 			//log
 		}
 
@@ -122,6 +139,7 @@ func Initiate() {
 				continue
 			}
 
+			app.rl.Config.AutoComplete = postLoginCompleter
 			handlers, ok = postLoginCmds[cmd[0]]
 
 		}
@@ -131,9 +149,7 @@ func Initiate() {
 			continue
 		}
 
-		err = handlers()
-		if err != nil {
-		}
+		handlers()
 
 		rl.SetPrompt("> ") // Precautionary doing so , for any handler that made changes
 	}

@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	cli.Initiate()
 	logger.LoggerInitiator()
+	cli.Initiate()
 
 }

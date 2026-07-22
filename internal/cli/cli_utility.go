@@ -71,7 +71,7 @@ func (a *App) handleLogin() {
 	}
 
 	// Check for the blocked time passing
-	if time.Now().After(singleUser.BlockedTime) {
+	if time.Now().Before(singleUser.BlockedTime) {
 		slog.Info("User", singleUser.Username, "Still blocked!!")
 		fmt.Println("Lockout for Many Incorrect Login Attempts!!")
 		return
@@ -83,51 +83,50 @@ func (a *App) handleLogin() {
 		slog.Error("Incorrect Password")
 		fmt.Println("Incorrect Password!!")
 
-		blockedUntil := time.Now().Add(15 * time.Minute)
-		// insert the increased attempt
-
 		// check for the attempt limit
 		if attempts+1 >= globaTryLimit {
-			//block
-			blockSQL := `INSERT INTO users (attempts, blockedTime) VALUES (?, ?) where username = ?;`
+			// block: reset attempts to 0 once blocked, set the lockout window
+			blockedUntil := time.Now().Add(15 * time.Minute)
+			blockSQL := `UPDATE users SET attempts = ?, blocked_time = ? WHERE username = ?;`
 			_, err := a.db.Exec(blockSQL, attempts+1, blockedUntil, username)
 			if err != nil {
-				slog.Error("Insert Failed : %v", err)
+				slog.Error("Update failed", "error", err)
 				fmt.Println("AUTH FAILURE")
 			}
 		} else {
-			increaseSQL := `INSERT INTO users (aattempts) VALUES (?) where username = ?;`
-
+			increaseSQL := `UPDATE users SET attempts = ? WHERE username = ?;`
 			_, err := a.db.Exec(increaseSQL, attempts+1, username)
 			if err != nil {
-				slog.Error("Insert Failed : ", err)
-				// print the error
+				slog.Error("Update failed", "error", err)
 				fmt.Println("AUTH FAILURE")
 			}
 		}
 		return
 	} else {
-		// make the  attempt 0 and no blocked time
-		attempts = 0
+		// successful login: reset attempts, clear any lockout, record last login
 		lastLogin := time.Now()
-		zeroAttemptSQL := `INSERT INTO users (attempts,lastlogin) VALUES (?, ?) where username = ?;`
-
-		_, err := a.db.Exec(zeroAttemptSQL, attempts, lastLogin, username)
+		zeroAttemptSQL := `UPDATE users SET attempts = 0, last_login = ? WHERE username = ?;`
+		_, err := a.db.Exec(zeroAttemptSQL, lastLogin, username)
 		if err != nil {
-			slog.Error("Insert Failed for the : ", err)
-
+			slog.Error("Update failed", "error", err)
 			fmt.Println("AUTH FAILURE")
 			return
 		}
-
 	}
 
-	// using 2FA thing
+	//Post login commmAND completion
+	a.rl.Config.AutoComplete = postLoginCompleter
 
 	// we have to populate the session here
 	loggedInAt := time.Now()
 	expiresAt := loggedInAt.Add(TIMEOUT)
-	a.session = &Session{UserID: int64(singleUser.ID), Username: username, ExpiresAt: expiresAt, LastLogin: singleUser.LastLogin}
+
+	func() {
+		a.session.UserID = int64(singleUser.ID)
+		a.session.Username = username
+		a.session.ExpiresAt = expiresAt
+		a.session.LastLogin = singleUser.LastLogin
+	}()
 
 	// Display the Post login Message ..
 
@@ -177,6 +176,13 @@ func (a *App) handleRegister() {
 	// populate the session here i would say soo that would be the helpful thing
 
 	a.session = &Session{UserID: lastID, Username: username, LastLogin: nil}
+	func() {
+		a.session.UserID = lastID
+		a.session.Username = username
+		a.session.LastLogin = nil
+	}()
+	a.rl.Config.AutoComplete = postLoginCompleter
+
 }
 
 /* Post Login Methods */
@@ -188,6 +194,7 @@ func (a *App) handleWhoami() {
 
 func (a *App) handleLogout() {
 	a.session = nil
+	a.rl.Config.AutoComplete = preLoginCompleter
 }
 
 func (a *App) handleEnable2Fa()
