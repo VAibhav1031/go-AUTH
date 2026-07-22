@@ -1,11 +1,10 @@
 services:
   app_cli:
     build: .
+    stdin_open: true
+    tty: true
     volumes:
       - auth_db:/app/data
 
-
-
 volumes:
   auth_db:
-

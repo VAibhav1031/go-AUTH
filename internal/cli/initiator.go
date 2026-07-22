@@ -61,6 +61,7 @@ func Initiate() {
 		password TEXT  NOT NULL,
 		created_at DATETIME,
 		mfa_enabled BOOL,
+		mfa_secret TEXT,
 		last_login DATETIME,
 		attempts INTEGER,
 		blocked_time DATETIME
@@ -68,13 +69,13 @@ func Initiate() {
 	if _, err := db.Exec(createTableSQL); err != nil {
 		slog.Error("Failed to create table ", "error :", err)
 		//  Some error and exit
+		fmt.Println("CLI Init-Setup Failed")
+		os.Exit(1)
 	}
 	/*------------------------------------ */
 
 	// CLI Related variable initialization
-	var currentSession *Session
 	var handlers func()
-	var ok bool
 
 	// Readline instance creation for the current tErminal
 	rl, err := readline.NewEx(&readline.Config{
@@ -89,7 +90,7 @@ func Initiate() {
 	defer rl.Close()
 
 	// App Object Construction
-	app := &App{db: db, session: currentSession, rl: rl}
+	app := &App{db: db, rl: rl}
 
 	// make sure app struct populated with necessary things
 	preLoginCmds := map[string]func(){
@@ -100,8 +101,8 @@ func Initiate() {
 
 	postLoginCmds := map[string]func(){
 		"whoami":      app.handleWhoami,
-		"enable-2fa":  nil,
-		"disable-2fa": nil,
+		"enable-2fa":  app.handleEnable2Fa,
+		"disable-2fa": app.handleDisable2Fa,
 		"logout":      app.handleLogout,
 		"help":        handlePostHelp}
 
@@ -137,15 +138,15 @@ func Initiate() {
 
 		/*  Session Management */
 		if app.session == nil {
-			handlers, ok = preLoginCmds[cmd[0]]
+			handlers = preLoginCmds[cmd[0]]
 			app.rl.Config.AutoComplete = preLoginCompleter
 		} else {
 			app.rl.Config.AutoComplete = postLoginCompleter
-			handlers, ok = postLoginCmds[cmd[0]]
+			handlers = postLoginCmds[cmd[0]]
 
 		}
 
-		if !ok {
+		if handlers == nil {
 			fmt.Printf("Unknown command!! '%v'", cmd[0])
 			continue
 		}

@@ -16,4 +16,4 @@ WORKDIR /app
 
 COPY --from=builder /app/go_auth . 
 CMD ["./go_auth"]
-
+# CMD ["sh"] // compose up only  give stderr/stdout  no tty means no interactive shell , so run -it 
