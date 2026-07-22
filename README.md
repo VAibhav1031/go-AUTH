@@ -2,6 +2,9 @@
 
 A command-line authentication system built in Go, supporting user registration, login, account lockout, session expiry, and optional TOTP-based two-factor authentication (Google Authenticator compatible) ,QR code Generated for ease. Runs fully containerized with persistent SQLite storage.
 
+## Demo
+[▶ Watch Demo (2 min)](https://drive.google.com/file/d/1O_zVZU8ip30mkUCrq2KD9OTUqbwN8aHF/view?usp=sharing)
+
 ## Features
 
 - User registration with bcrypt password hashing (salted)
@@ -140,10 +143,10 @@ CREATE TABLE IF NOT EXISTS users (
     username TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
     created_at DATETIME,
-    mfa_enabled BOOL,
-    mfa_secret TEXT,
+    mfa_enabled BOOL DEFAULT 0,
+    mfa_secret TEXT DEFAULT '',
     last_login DATETIME,
-    attempts INTEGER,
+    attempts INTEGER DEFAULT 0,
     blocked_time DATETIME
 );
 ```
